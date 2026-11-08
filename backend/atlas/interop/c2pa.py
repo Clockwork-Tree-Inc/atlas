@@ -202,12 +202,15 @@ def read_assertion(signed_path: str, *, ca_pem: Optional[bytes] = None) -> dict[
     can be asserted (otherwise the signer reads as 'untrusted', which is expected).
     """
     c2pa = _require_c2pa()
+    context = None
     if ca_pem is not None:
-        c2pa.load_settings(json.dumps({
+        # Per-reader settings (not the deprecated process-wide load_settings), so one read's trust
+        # anchors never leak into another's.
+        context = c2pa.Context.from_dict({
             "trust": {"trust_anchors": ca_pem.decode()},
             "verify": {"verify_trust": True},
-        }))
-    reader = c2pa.Reader(signed_path)
+        })
+    reader = c2pa.Reader(signed_path, context=context)
     report = json.loads(reader.json())
     active = report.get("active_manifest")
     am = report.get("manifests", {}).get(active, {})
